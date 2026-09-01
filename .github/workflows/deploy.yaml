@@ -198,7 +198,14 @@ jobs:
               LambdaCodeBucket=${{ env.BUCKET_NAME }} \
               NotificationEmail=${{ secrets.NOTIFICATION_EMAIL }} \
             --capabilities CAPABILITY_NAMED_IAM \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset || {
+            echo "❌ Deployment failed. Fetching stack events..."
+            aws cloudformation describe-stack-events \
+              --stack-name $STACK_NAME \
+              --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED` || ResourceStatus==`ROLLBACK_IN_PROGRESS` || ResourceStatus==`DELETE_IN_PROGRESS`]' \
+              --output table
+            exit 1
+          }
 
       - name: Wait for stack completion
         run: |
