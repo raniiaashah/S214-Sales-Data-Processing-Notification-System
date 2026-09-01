@@ -22,21 +22,22 @@ logger.setLevel(logging.INFO)
 
 class DatabaseError(Exception):
     """Custom exception for database operations."""
+
     pass
 
 
 class Database:
     """
     Database connection manager for MySQL RDS.
-    
+
     Handles connection lifecycle, query execution, and error handling.
     Connections are created on demand and should be closed after use.
     """
 
-    def __init__(self, secret_arn: str, region: str = 'us-east-1'):
+    def __init__(self, secret_arn: str, region: str = "us-east-1"):
         """
         Initialize the Database manager.
-        
+
         Args:
             secret_arn: ARN of the Secrets Manager secret containing credentials
             region: AWS region where the secret is stored
@@ -49,10 +50,10 @@ class Database:
     def _get_credentials(self) -> Dict[str, str]:
         """
         Retrieve database credentials from AWS Secrets Manager.
-        
+
         Returns:
             Dictionary containing username, password, host, port, dbname
-            
+
         Raises:
             DatabaseError: If credentials cannot be retrieved
         """
@@ -60,21 +61,23 @@ class Database:
             return self.credentials
 
         try:
-            client = boto3.client('secretsmanager', region_name=self.region)
+            client = boto3.client("secretsmanager", region_name=self.region)
             response = client.get_secret_value(SecretId=self.secret_arn)
-            secret = json.loads(response['SecretString'])
-            
+            secret = json.loads(response["SecretString"])
+
             self.credentials = {
-                'username': secret['username'],
-                'password': secret['password'],
-                'host': secret.get('host', ''),
-                'port': secret.get('port', 3306),
-                'dbname': secret.get('dbname', 'salesdb')
+                "username": secret["username"],
+                "password": secret["password"],
+                "host": secret.get("host", ""),
+                "port": secret.get("port", 3306),
+                "dbname": secret.get("dbname", "salesdb"),
             }
-            
-            logger.info("Successfully retrieved database credentials from Secrets Manager")
+
+            logger.info(
+                "Successfully retrieved database credentials from Secrets Manager"
+            )
             return self.credentials
-            
+
         except Exception as e:
             logger.error(f"Failed to retrieve database credentials: {str(e)}")
             raise DatabaseError(f"Failed to retrieve credentials: {str(e)}")
@@ -82,7 +85,7 @@ class Database:
     def connect(self) -> None:
         """
         Establish a connection to the MySQL database.
-        
+
         Raises:
             DatabaseError: If connection cannot be established
         """
@@ -91,22 +94,22 @@ class Database:
 
         try:
             credentials = self._get_credentials()
-            
+
             self.connection = pymysql.connect(
-                host=credentials['host'],
-                user=credentials['username'],
-                password=credentials['password'],
-                database=credentials['dbname'],
-                port=credentials['port'],
-                charset='utf8mb4',
+                host=credentials["host"],
+                user=credentials["username"],
+                password=credentials["password"],
+                database=credentials["dbname"],
+                port=credentials["port"],
+                charset="utf8mb4",
                 cursorclass=pymysql.cursors.DictCursor,
                 connect_timeout=10,
                 read_timeout=30,
-                write_timeout=30
+                write_timeout=30,
             )
-            
+
             logger.info("Successfully connected to database")
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to database: {str(e)}")
             raise DatabaseError(f"Failed to connect to database: {str(e)}")
@@ -122,17 +125,19 @@ class Database:
             finally:
                 self.connection = None
 
-    def execute_query(self, query: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
+    def execute_query(
+        self, query: str, params: Optional[tuple] = None
+    ) -> List[Dict[str, Any]]:
         """
         Execute a SELECT query and return results.
-        
+
         Args:
             query: SQL query string
             params: Query parameters (for parameterized queries)
-            
+
         Returns:
             List of dictionaries containing query results
-            
+
         Raises:
             DatabaseError: If query execution fails
         """
@@ -143,9 +148,11 @@ class Database:
             with self.connection.cursor() as cursor:
                 cursor.execute(query, params)
                 results = cursor.fetchall()
-                logger.info(f"Query executed successfully, returned {len(results)} rows")
+                logger.info(
+                    f"Query executed successfully, returned {len(results)} rows"
+                )
                 return results
-                
+
         except Exception as e:
             logger.error(f"Query execution failed: {str(e)}")
             raise DatabaseError(f"Query execution failed: {str(e)}")
@@ -153,14 +160,14 @@ class Database:
     def execute_update(self, query: str, params: Optional[tuple] = None) -> int:
         """
         Execute an INSERT, UPDATE, or DELETE query.
-        
+
         Args:
             query: SQL query string
             params: Query parameters (for parameterized queries)
-            
+
         Returns:
             Number of affected rows
-            
+
         Raises:
             DatabaseError: If query execution fails
         """
@@ -172,9 +179,11 @@ class Database:
                 cursor.execute(query, params)
                 self.connection.commit()
                 affected_rows = cursor.rowcount
-                logger.info(f"Update executed successfully, affected {affected_rows} rows")
+                logger.info(
+                    f"Update executed successfully, affected {affected_rows} rows"
+                )
                 return affected_rows
-                
+
         except Exception as e:
             if self.connection:
                 self.connection.rollback()
