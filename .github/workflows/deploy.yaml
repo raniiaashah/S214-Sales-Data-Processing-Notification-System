@@ -122,6 +122,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check AWS Secrets
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "❌ AWS_ACCESS_KEY_ID is EMPTY"
+            exit 1
+          else
+            echo "✅ AWS_ACCESS_KEY_ID is available"
+          fi
+
+          if [ -z "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "❌ AWS_SECRET_ACCESS_KEY is EMPTY"
+            exit 1
+          else
+            echo "✅ AWS_SECRET_ACCESS_KEY is available"
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
