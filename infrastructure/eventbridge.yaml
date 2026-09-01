@@ -40,10 +40,6 @@ Parameters:
     Type: String
     Description: ARN of the processor Lambda function
 
-  EventBridgeRoleArn:
-    Type: String
-    Description: IAM role ARN for EventBridge to invoke Lambda
-
 Resources:
   # ============================================
   # EventBridge Scheduled Rule

@@ -195,6 +195,7 @@ Resources:
           Value: !Sub 's214-${Environment}-security-groups-stack'
         - Key: StackType
           Value: SecurityGroups
+      TimeoutInMinutes: 10
 
   # ============================================
   # SNS Stack
@@ -241,7 +242,6 @@ Resources:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/rds.yaml'
       Parameters:
         Environment: !Ref Environment
-        VpcId: !GetAtt VPCStack.Outputs.VPCId
         PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
         PrivateSubnet2Id: !GetAtt VPCStack.Outputs.PrivateSubnet2Id
         RDSSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.RDSSecurityGroupId
@@ -269,7 +269,6 @@ Resources:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/secrets.yaml'
       Parameters:
         Environment: !Ref Environment
-        VpcId: !GetAtt VPCStack.Outputs.VPCId
         RDSEndpoint: !GetAtt RDSStack.Outputs.DBInstanceEndpoint
         SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
       Tags:
@@ -292,7 +291,6 @@ Resources:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/lambda.yaml'
       Parameters:
         Environment: !Ref Environment
-        VpcId: !GetAtt VPCStack.Outputs.VPCId
         PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
         PrivateSubnet2Id: !GetAtt VPCStack.Outputs.PrivateSubnet2Id
         LambdaSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.LambdaSecurityGroupId
@@ -321,7 +319,6 @@ Resources:
         Environment: !Ref Environment
         ScheduleExpression: !Ref ScheduleExpression
         ProcessorLambdaArn: !GetAtt LambdaStack.Outputs.ProcessorLambdaArn
-        EventBridgeRoleArn: !GetAtt IAMStack.Outputs.EventBridgeLambdaRoleArn
       Tags:
         - Key: Name
           Value: !Sub 's214-${Environment}-eventbridge-stack'

@@ -19,10 +19,6 @@ Parameters:
     Default: dev
     Description: Environment name (dev, staging, prod)
 
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: VPC ID for DB subnet group
-
   PrivateSubnet1Id:
     Type: AWS::EC2::Subnet::Id
     Description: Private subnet 1 ID
@@ -125,7 +121,7 @@ Resources:
       DBInstanceIdentifier: !Sub 's214-${Environment}-rds'
       DBInstanceClass: !Ref DBInstanceClass
       Engine: mysql
-      EngineVersion: '8.0'
+      EngineVersion: '8.0.39'
       MasterUsername: !Ref MasterUsername
       MasterUserPassword: !Sub '{{resolve:secretsmanager:${SecretArn}:SecretString:password}}'
       DBSubnetGroupName: !Ref DBSubnetGroup

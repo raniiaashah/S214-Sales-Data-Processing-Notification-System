@@ -22,11 +22,6 @@ Parameters:
     Type: AWS::EC2::VPC::Id
     Description: VPC ID where security groups will be created
 
-  VpcCidr:
-    Type: String
-    Default: 10.0.0.0/16
-    Description: VPC CIDR block for internal communication
-
 Resources:
   # ============================================
   # RDS Security Group
@@ -39,12 +34,6 @@ Resources:
       GroupName: !Sub 's214-${Environment}-rds-sg'
       GroupDescription: 'Security group for RDS MySQL - allows access from Lambda only'
       VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          SourceSecurityGroupId: !Ref LambdaSecurityGroup
-          Description: 'MySQL access from Lambda'
       SecurityGroupEgress:
         - IpProtocol: '-1'
           CidrIp: 0.0.0.0/0
@@ -72,11 +61,6 @@ Resources:
       VpcId: !Ref VpcId
       SecurityGroupEgress:
         - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
-          DestinationSecurityGroupId: !Ref RDSSecurityGroup
-          Description: 'MySQL access to RDS'
-        - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
           CidrIp: 0.0.0.0/0
@@ -95,6 +79,34 @@ Resources:
           Value: s214-sales-platform
         - Key: ResourceType
           Value: Lambda
+
+  # ============================================
+  # RDS Ingress Rule (after both SGs created)
+  # ============================================
+  # Allows inbound MySQL traffic from Lambda security group
+  RDSSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RDSSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Description: 'MySQL access from Lambda'
+
+  # ============================================
+  # Lambda Egress Rule to RDS
+  # ============================================
+  # Allows outbound MySQL traffic to RDS security group
+  LambdaSecurityGroupEgressRDS:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 3306
+      ToPort: 3306
+      DestinationSecurityGroupId: !Ref RDSSecurityGroup
+      Description: 'MySQL access to RDS'
 
   # ============================================
   # VPC Endpoint Security Group (for AWS services)
