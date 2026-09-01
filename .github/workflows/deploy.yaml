@@ -167,6 +167,25 @@ jobs:
           
           echo "BUCKET_NAME=$BUCKET_NAME" >> $GITHUB_ENV
 
+      - name: Clean up ROLLBACK_COMPLETE stacks
+        run: |
+          STACK_NAME="s214-${{ needs.determine-env.outputs.environment }}-sales-platform"
+          
+          # Check if stack exists and is in ROLLBACK_COMPLETE state
+          STACK_STATUS=$(aws cloudformation describe-stacks \
+            --stack-name $STACK_NAME \
+            --query 'Stacks[0].StackStatus' \
+            --output text 2>/dev/null || echo "NONE")
+          
+          if [ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]; then
+            echo "⚠️  Stack is in ROLLBACK_COMPLETE state, deleting..."
+            aws cloudformation delete-stack --stack-name $STACK_NAME
+            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
+            echo "✅ Stack deleted successfully"
+          else
+            echo "✅ Stack status: $STACK_STATUS (no cleanup needed)"
+          fi
+
       - name: Deploy CloudFormation stack
         run: |
           STACK_NAME="s214-${{ needs.determine-env.outputs.environment }}-sales-platform"
