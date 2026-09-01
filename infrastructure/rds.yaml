@@ -121,7 +121,7 @@ Resources:
       DBInstanceIdentifier: !Sub 's214-${Environment}-rds'
       DBInstanceClass: !Ref DBInstanceClass
       Engine: mysql
-      EngineVersion: '8.0.39'
+      EngineVersion: '8.0.46'
       MasterUsername: !Ref MasterUsername
       MasterUserPassword: !Sub '{{resolve:secretsmanager:${SecretArn}:SecretString:password}}'
       DBSubnetGroupName: !Ref DBSubnetGroup

@@ -26,7 +26,7 @@ Parameters:
   KMSKeyId:
     Type: String
     Default: 'alias/aws/sns'
-    Description: KMS key ID for SNS encryption (default: AWS managed key)
+    Description: 'KMS key ID for SNS encryption (default: AWS managed key)'
 
 Resources:
   # ============================================

@@ -218,7 +218,6 @@ Resources:
   # ============================================
   IAMStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn: SNSStack
     Properties:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/iam.yaml'
       Parameters:
@@ -236,7 +235,6 @@ Resources:
   RDSStack:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-      - VPCStack
       - SecurityGroupsStack
     Properties:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/rds.yaml'
@@ -264,7 +262,6 @@ Resources:
     Type: AWS::CloudFormation::Stack
     DependsOn:
       - RDSStack
-      - SNSStack
     Properties:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/secrets.yaml'
       Parameters:
@@ -283,7 +280,6 @@ Resources:
   LambdaStack:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-      - VPCStack
       - SecurityGroupsStack
       - IAMStack
       - SecretsStack
@@ -312,7 +308,6 @@ Resources:
   # ============================================
   EventBridgeStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn: LambdaStack
     Properties:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/eventbridge.yaml'
       Parameters:
@@ -332,7 +327,6 @@ Resources:
     Type: Custom::DatabaseInitializer
     DependsOn:
       - LambdaStack
-      - SecretsStack
     Properties:
       ServiceToken: !GetAtt LambdaStack.Outputs.ProcessorLambdaArn
       SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
