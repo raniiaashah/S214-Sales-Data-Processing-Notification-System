@@ -1,0 +1,5 @@
+# Processor Lambda Dependencies
+# Keep dependencies minimal to reduce cold start time
+
+boto3>=1.28.0
+pymysql>=1.1.0

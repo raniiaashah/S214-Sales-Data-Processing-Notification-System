@@ -1,0 +1,228 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - IAM Roles and Policies
+  This template creates IAM roles with least-privilege permissions.
+  Each Lambda function has a dedicated IAM role with minimal required permissions.
+
+  IAM Architecture:
+  - Processor Lambda Role: CloudWatch Logs, Secrets Manager Read, SNS Publish
+  - Custom Resource Lambda Role: CloudWatch Logs, Secrets Manager Read
+  - No wildcard permissions
+  - No AdministratorAccess'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  SecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret
+
+  SNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic
+
+Resources:
+  # ============================================
+  # Processor Lambda IAM Role
+  # ============================================
+  # This role grants the sales processor Lambda function the minimum
+  # permissions required to:
+  # - Write logs to CloudWatch
+  # - Read database credentials from Secrets Manager
+  # - Publish messages to SNS
+  ProcessorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 's214-${Environment}-processor-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: ProcessorLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs permissions
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/s214-${Environment}-sales-processor:*'
+
+              # Secrets Manager read permission
+              - Sid: SecretsManagerRead
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref SecretArn
+
+              # SNS publish permission
+              - Sid: SNSPublish
+                Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource:
+                  - !Ref SNSTopicArn
+
+              # KMS permission for Secrets Manager encryption
+              - Sid: KMSDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'kms:ViaService': !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-processor-lambda-role'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: IAM
+
+  # ============================================
+  # Custom Resource Lambda IAM Role
+  # ============================================
+  # This role grants the custom resource Lambda function the minimum
+  # permissions required to:
+  # - Write logs to CloudWatch
+  # - Read database credentials from Secrets Manager
+  CustomResourceLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 's214-${Environment}-custom-resource-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: CustomResourceLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs permissions
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/s214-${Environment}-custom-resource:*'
+
+              # Secrets Manager read permission
+              - Sid: SecretsManagerRead
+                Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref SecretArn
+
+              # KMS permission for Secrets Manager encryption
+              - Sid: KMSDecrypt
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'kms:ViaService': !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-custom-resource-lambda-role'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: IAM
+
+  # ============================================
+  # EventBridge Lambda Invoke Role
+  # ============================================
+  # This role allows EventBridge to invoke the processor Lambda
+  EventBridgeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 's214-${Environment}-eventbridge-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: EventBridgeLambdaInvokePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:s214-${Environment}-sales-processor'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-eventbridge-lambda-role'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: IAM
+
+Outputs:
+  ProcessorLambdaRoleArn:
+    Description: Processor Lambda IAM Role ARN
+    Value: !GetAtt ProcessorLambdaRole.Arn
+    Export:
+      Name: !Sub 's214-${Environment}-processor-lambda-role-arn'
+
+  ProcessorLambdaRoleName:
+    Description: Processor Lambda IAM Role Name
+    Value: !Ref ProcessorLambdaRole
+    Export:
+      Name: !Sub 's214-${Environment}-processor-lambda-role-name'
+
+  CustomResourceLambdaRoleArn:
+    Description: Custom Resource Lambda IAM Role ARN
+    Value: !GetAtt CustomResourceLambdaRole.Arn
+    Export:
+      Name: !Sub 's214-${Environment}-custom-resource-lambda-role-arn'
+
+  CustomResourceLambdaRoleName:
+    Description: Custom Resource Lambda IAM Role Name
+    Value: !Ref CustomResourceLambdaRole
+    Export:
+      Name: !Sub 's214-${Environment}-custom-resource-lambda-role-name'
+
+  EventBridgeLambdaRoleArn:
+    Description: EventBridge Lambda Invoke IAM Role ARN
+    Value: !GetAtt EventBridgeLambdaRole.Arn
+    Export:
+      Name: !Sub 's214-${Environment}-eventbridge-lambda-role-arn'

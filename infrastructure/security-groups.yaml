@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - Security Groups
+  This template creates security groups with least-privilege access control.
+  Security groups are used to control traffic flow between resources.
+
+  Security Group Architecture:
+  - RDS Security Group: Allows MySQL access only from Lambda
+  - Lambda Security Group: Allows outbound traffic to RDS and AWS services
+  - Security group references used instead of CIDR blocks'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID where security groups will be created
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: VPC CIDR block for internal communication
+
+Resources:
+  # ============================================
+  # RDS Security Group
+  # ============================================
+  # Allows inbound MySQL traffic only from Lambda security group
+  # No public access - RDS is in private subnets
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 's214-${Environment}-rds-sg'
+      GroupDescription: 'Security group for RDS MySQL - allows access from Lambda only'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+          Description: 'MySQL access from Lambda'
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+          Description: 'Allow all outbound traffic'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-rds-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: RDS
+
+  # ============================================
+  # Lambda Security Group
+  # ============================================
+  # Allows outbound traffic to RDS and AWS services
+  # No inbound rules - Lambda is invoked by AWS services
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 's214-${Environment}-lambda-sg'
+      GroupDescription: 'Security group for Lambda functions - allows outbound to RDS and AWS services'
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          DestinationSecurityGroupId: !Ref RDSSecurityGroup
+          Description: 'MySQL access to RDS'
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTPS to AWS services'
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: 'HTTP for external APIs'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-lambda-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: Lambda
+
+  # ============================================
+  # VPC Endpoint Security Group (for AWS services)
+  # ============================================
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 's214-${Environment}-vpc-endpoint-sg'
+      GroupDescription: 'Security group for VPC endpoints - allows HTTPS from Lambda'
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          SourceSecurityGroupId: !Ref LambdaSecurityGroup
+          Description: 'HTTPS from Lambda'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-vpc-endpoint-sg'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: VPCEndpoint
+
+  # ============================================
+  # VPC Endpoints (to reduce NAT Gateway costs)
+  # ============================================
+  # S3 Gateway Endpoint (free)
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-rt-id'
+
+  # Secrets Manager Interface Endpoint
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-subnet-1-id'
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-subnet-2-id'
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  # SNS Interface Endpoint
+  SNSEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.sns'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-subnet-1-id'
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-subnet-2-id'
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+  # CloudWatch Logs Interface Endpoint
+  CloudWatchLogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-subnet-1-id'
+        - !ImportValue
+          Fn::Sub: 's214-${Environment}-private-subnet-2-id'
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+      PrivateDnsEnabled: true
+
+Outputs:
+  RDSSecurityGroupId:
+    Description: RDS Security Group ID
+    Value: !Ref RDSSecurityGroup
+    Export:
+      Name: !Sub 's214-${Environment}-rds-sg-id'
+
+  LambdaSecurityGroupId:
+    Description: Lambda Security Group ID
+    Value: !Ref LambdaSecurityGroup
+    Export:
+      Name: !Sub 's214-${Environment}-lambda-sg-id'
+
+  VPCEndpointSecurityGroupId:
+    Description: VPC Endpoint Security Group ID
+    Value: !Ref VPCEndpointSecurityGroup
+    Export:
+      Name: !Sub 's214-${Environment}-vpc-endpoint-sg-id'
+
+  SecretsManagerEndpointId:
+    Description: Secrets Manager VPC Endpoint ID
+    Value: !Ref SecretsManagerEndpoint
+    Export:
+      Name: !Sub 's214-${Environment}-secretsmanager-endpoint-id'
+
+  SNSEndpointId:
+    Description: SNS VPC Endpoint ID
+    Value: !Ref SNSEndpoint
+    Export:
+      Name: !Sub 's214-${Environment}-sns-endpoint-id'
+
+  CloudWatchLogsEndpointId:
+    Description: CloudWatch Logs VPC Endpoint ID
+    Value: !Ref CloudWatchLogsEndpoint
+    Export:
+      Name: !Sub 's214-${Environment}-cloudwatchlogs-endpoint-id'

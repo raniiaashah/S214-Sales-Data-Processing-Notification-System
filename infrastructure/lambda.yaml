@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - Lambda Functions
+  This template creates:
+  - Sales Processor Lambda function
+  - CloudWatch Log Groups
+  - Lambda permissions for EventBridge
+
+  Lambda Architecture:
+  - Processor Lambda: Processes daily sales and sends reports
+  - Runs in VPC private subnets for RDS access
+  - Retrieves credentials from Secrets Manager'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for Lambda
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet 2 ID
+
+  LambdaSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Lambda security group ID
+
+  ProcessorLambdaRoleArn:
+    Type: String
+    Description: Processor Lambda IAM role ARN
+
+  SecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret
+
+  SNSTopicArn:
+    Type: String
+    Description: ARN of the SNS topic
+
+  ProcessorMemorySize:
+    Type: Number
+    Default: 128
+    MinValue: 128
+    MaxValue: 10240
+    Description: Processor Lambda memory size in MB
+
+  ProcessorTimeout:
+    Type: Number
+    Default: 60
+    MinValue: 1
+    MaxValue: 900
+    Description: Processor Lambda timeout in seconds
+
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365]
+    Description: CloudWatch log retention in days
+
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda code
+
+  LambdaCodeKey:
+    Type: String
+    Default: lambda/processor.zip
+    Description: S3 key for Lambda code package
+
+Resources:
+  # ============================================
+  # Processor Lambda - CloudWatch Log Group
+  # ============================================
+  ProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/s214-${Environment}-sales-processor'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # ============================================
+  # Processor Lambda Function
+  # ============================================
+  ProcessorLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: ProcessorLogGroup
+    Properties:
+      FunctionName: !Sub 's214-${Environment}-sales-processor'
+      Description: 'Processes daily sales data and sends reports via SNS'
+      Runtime: python3.14
+      Handler: lambda_function.lambda_handler
+      Role: !Ref ProcessorLambdaRoleArn
+      MemorySize: !Ref ProcessorMemorySize
+      Timeout: !Ref ProcessorTimeout
+      ReservedConcurrentExecutions: 10
+      Environment:
+        Variables:
+          SECRET_ARN: !Ref SecretArn
+          SNS_TOPIC_ARN: !Ref SNSTopicArn
+          ENVIRONMENT: !Ref Environment
+          LOG_LEVEL: INFO
+      VpcConfig:
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroupId
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref LambdaCodeKey
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-sales-processor'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: Lambda
+
+  # ============================================
+  # Lambda Permission for EventBridge
+  # ============================================
+  ProcessorLambdaEventBridgePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ProcessorLambda
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/s214-${Environment}-daily-sales-report'
+
+  # ============================================
+  # CloudWatch Alarm - Lambda Errors
+  # ============================================
+  ProcessorLambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 's214-${Environment}-processor-errors'
+      AlarmDescription: 'Alarm when processor Lambda errors exceed threshold'
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ProcessorLambda
+      AlarmActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: notBreaching
+
+  # ============================================
+  # CloudWatch Alarm - Lambda Duration
+  # ============================================
+  ProcessorLambdaDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 's214-${Environment}-processor-duration'
+      AlarmDescription: 'Alarm when processor Lambda duration exceeds threshold'
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: !Ref ProcessorTimeout
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ProcessorLambda
+      AlarmActions:
+        - !Ref SNSTopicArn
+      TreatMissingData: notBreaching
+
+Outputs:
+  ProcessorLambdaArn:
+    Description: Processor Lambda ARN
+    Value: !GetAtt ProcessorLambda.Arn
+    Export:
+      Name: !Sub 's214-${Environment}-processor-lambda-arn'
+
+  ProcessorLambdaName:
+    Description: Processor Lambda Name
+    Value: !Ref ProcessorLambda
+    Export:
+      Name: !Sub 's214-${Environment}-processor-lambda-name'
+
+  ProcessorLogGroupName:
+    Description: Processor Lambda Log Group Name
+    Value: !Ref ProcessorLogGroup
+    Export:
+      Name: !Sub 's214-${Environment}-processor-log-group'

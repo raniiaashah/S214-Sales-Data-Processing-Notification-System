@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - Amazon RDS MySQL Database
+  This template creates a production-style RDS MySQL database in private subnets.
+
+  RDS Architecture:
+  - MySQL 8.0 engine
+  - Deployed in private subnets (no public access)
+  - Encryption at rest enabled
+  - Automated backups with configurable retention
+  - Security group restricts access to Lambda only'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID for DB subnet group
+
+  PrivateSubnet1Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet 1 ID
+
+  PrivateSubnet2Id:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet 2 ID
+
+  RDSSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: RDS security group ID
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues:
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+      - db.t3.large
+      - db.m5.large
+    Description: RDS instance class
+
+  AllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 1000
+    Description: Allocated storage in GB
+
+  MaxAllocatedStorage:
+    Type: Number
+    Default: 100
+    MinValue: 20
+    MaxValue: 1000
+    Description: Maximum allocated storage for autoscaling in GB
+
+  BackupRetentionPeriod:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 35
+    Description: Backup retention period in days
+
+  MultiAZ:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable Multi-AZ deployment
+
+  DeletionProtection:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable deletion protection
+
+  MasterUsername:
+    Type: String
+    Default: admin
+    NoEcho: true
+    Description: Master username for RDS
+
+  SecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret
+
+Resources:
+  # ============================================
+  # DB Subnet Group
+  # ============================================
+  # RDS requires a DB subnet group spanning multiple AZs
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub 's214-${Environment}-db-subnet-group'
+      DBSubnetGroupDescription: !Sub 'DB subnet group for S214 ${Environment}'
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-db-subnet-group'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+
+  # ============================================
+  # RDS MySQL Instance
+  # ============================================
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub 's214-${Environment}-rds'
+      DBInstanceClass: !Ref DBInstanceClass
+      Engine: mysql
+      EngineVersion: '8.0'
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${SecretArn}:SecretString:password}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RDSSecurityGroupId
+      AllocatedStorage: !Ref AllocatedStorage
+      MaxAllocatedStorage: !Ref MaxAllocatedStorage
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      MultiAZ: !Ref MultiAZ
+      StorageEncrypted: true
+      DeletionProtection: !Ref DeletionProtection
+      PubliclyAccessible: false
+      StorageType: gp2
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      EnablePerformanceInsights: false
+      MonitoringInterval: 0
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-rds'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: RDS
+
+Outputs:
+  DBInstanceIdentifier:
+    Description: RDS DB Instance Identifier
+    Value: !Ref DBInstance
+    Export:
+      Name: !Sub 's214-${Environment}-rds-identifier'
+
+  DBInstanceEndpoint:
+    Description: RDS DB Instance Endpoint
+    Value: !GetAtt DBInstance.Endpoint.Address
+    Export:
+      Name: !Sub 's214-${Environment}-rds-endpoint'
+
+  DBInstancePort:
+    Description: RDS DB Instance Port
+    Value: !GetAtt DBInstance.Endpoint.Port
+    Export:
+      Name: !Sub 's214-${Environment}-rds-port'
+
+  DBSubnetGroupName:
+    Description: DB Subnet Group Name
+    Value: !Ref DBSubnetGroup
+    Export:
+      Name: !Sub 's214-${Environment}-db-subnet-group-name'

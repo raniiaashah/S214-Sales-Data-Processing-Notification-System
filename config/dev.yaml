@@ -1,0 +1,71 @@
+# Development Environment Configuration
+# This file contains environment-specific settings for the dev environment
+
+environment: dev
+region: us-east-1
+
+# VPC Configuration
+vpc:
+  cidr: 10.0.0.0/16
+  enableDnsHostnames: true
+  enableDnsSupport: true
+
+# Subnet Configuration
+subnets:
+  public:
+    - cidr: 10.0.1.0/24
+      az: a
+    - cidr: 10.0.2.0/24
+      az: b
+  private:
+    - cidr: 10.0.10.0/24
+      az: a
+    - cidr: 10.0.11.0/24
+      az: b
+
+# RDS Configuration
+rds:
+  engine: mysql
+  engineVersion: "8.0"
+  instanceClass: db.t3.micro
+  allocatedStorage: 20
+  maxAllocatedStorage: 100
+  backupRetention: 1
+  multiAz: false
+  storageEncrypted: true
+  deletionProtection: false
+  masterUsername: admin
+
+# Lambda Configuration
+lambda:
+  processor:
+    memorySize: 128
+    timeout: 60
+    runtime: python3.11
+    logRetention: 7
+  customResource:
+    memorySize: 128
+    timeout: 120
+    runtime: python3.11
+    logRetention: 7
+
+# EventBridge Configuration
+eventbridge:
+  schedule: "cron(0 8 * * ? *)"  # Daily at 8 AM UTC
+  enabled: true
+
+# SNS Configuration
+sns:
+  notificationEmail: dev@example.com
+
+# CloudWatch Configuration
+cloudwatch:
+  logRetentionDays: 7
+  alarmEvaluationPeriods: 2
+  alarmThreshold: 1
+
+# Tags
+tags:
+  Environment: dev
+  Project: s214-sales-platform
+  ManagedBy: cloudformation

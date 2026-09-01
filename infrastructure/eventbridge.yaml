@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - EventBridge Scheduled Rule
+  This template creates:
+  - EventBridge scheduled rule for daily sales processing
+  - Configurable schedule expression
+  - Lambda invocation target
+
+  Schedule Configuration:
+  - Default: Daily at 8:00 AM UTC
+  - Configurable via ScheduleExpression parameter
+  - Uses cron expressions for scheduling'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  ScheduleExpression:
+    Type: String
+    Default: 'cron(0 8 * * ? *)'
+    Description: >
+      Schedule expression for the rule.
+      Format: cron(minutes hours day-of-month month day-of-week year)
+      Example: cron(0 8 * * ? *) = Daily at 8:00 AM UTC
+
+  RuleEnabled:
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Whether the rule is enabled
+
+  ProcessorLambdaArn:
+    Type: String
+    Description: ARN of the processor Lambda function
+
+  EventBridgeRoleArn:
+    Type: String
+    Description: IAM role ARN for EventBridge to invoke Lambda
+
+Resources:
+  # ============================================
+  # EventBridge Scheduled Rule
+  # ============================================
+  DailySalesReportRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 's214-${Environment}-daily-sales-report'
+      Description: !Sub 'Triggers daily sales report processing for ${Environment}'
+      ScheduleExpression: !Ref ScheduleExpression
+      State: !If
+        - IsEnabled
+        - ENABLED
+        - DISABLED
+      Targets:
+        - Id: SalesProcessorTarget
+          Arn: !Ref ProcessorLambdaArn
+          Input: !Sub |
+            {
+              "source": "eventbridge",
+              "environment": "${Environment}"
+            }
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-daily-sales-report'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: EventBridge
+
+  # ============================================
+  # EventBridge Lambda Permission
+  # ============================================
+  EventBridgeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ProcessorLambdaArn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DailySalesReportRule.Arn
+
+Conditions:
+  IsEnabled: !Equals [!Ref RuleEnabled, 'true']
+
+Outputs:
+  RuleArn:
+    Description: EventBridge Rule ARN
+    Value: !GetAtt DailySalesReportRule.Arn
+    Export:
+      Name: !Sub 's214-${Environment}-eventbridge-rule-arn'
+
+  RuleName:
+    Description: EventBridge Rule Name
+    Value: !Ref DailySalesReportRule
+    Export:
+      Name: !Sub 's214-${Environment}-eventbridge-rule-name'

@@ -1,0 +1,367 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - Root CloudFormation Stack
+  This is the main orchestration template that deploys all nested stacks.
+  
+  Architecture:
+  - VPC and Networking
+  - Security Groups and IAM
+  - Secrets Manager and SSM
+  - RDS MySQL Database
+  - SNS Notifications
+  - Lambda Functions
+  - EventBridge Scheduling
+  - Custom Resource for Database Initialization
+
+  Deployment Order:
+  1. VPC Stack (networking foundation)
+  2. Security Groups Stack (depends on VPC)
+  3. SNS Stack (notification topic)
+  4. IAM Stack (depends on SNS)
+  5. RDS Stack (depends on VPC, Security Groups)
+  6. Secrets Stack (depends on RDS, SNS)
+  7. Lambda Stack (depends on VPC, IAM, Secrets, SNS)
+  8. EventBridge Stack (depends on Lambda)
+  9. Custom Resource (depends on Lambda, Secrets)'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR block for the VPC
+
+  PublicSubnet1Cidr:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR block for public subnet 1
+
+  PublicSubnet2Cidr:
+    Type: String
+    Default: 10.0.2.0/24
+    Description: CIDR block for public subnet 2
+
+  PrivateSubnet1Cidr:
+    Type: String
+    Default: 10.0.10.0/24
+    Description: CIDR block for private subnet 1
+
+  PrivateSubnet2Cidr:
+    Type: String
+    Default: 10.0.11.0/24
+    Description: CIDR block for private subnet 2
+
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    AllowedValues:
+      - db.t3.micro
+      - db.t3.small
+      - db.t3.medium
+      - db.t3.large
+    Description: RDS instance class
+
+  AllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+    MaxValue: 1000
+    Description: RDS allocated storage in GB
+
+  BackupRetentionPeriod:
+    Type: Number
+    Default: 1
+    MinValue: 0
+    MaxValue: 35
+    Description: RDS backup retention period in days
+
+  MultiAZ:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enable Multi-AZ deployment
+
+  ProcessorMemorySize:
+    Type: Number
+    Default: 128
+    MinValue: 128
+    MaxValue: 10240
+    Description: Processor Lambda memory size in MB
+
+  ProcessorTimeout:
+    Type: Number
+    Default: 60
+    MinValue: 1
+    MaxValue: 900
+    Description: Processor Lambda timeout in seconds
+
+  ScheduleExpression:
+    Type: String
+    Default: 'cron(0 8 * * ? *)'
+    Description: EventBridge schedule expression
+
+  NotificationEmail:
+    Type: String
+    Description: Email address for notifications (requires confirmation)
+
+  LambdaCodeBucket:
+    Type: String
+    Description: S3 bucket containing Lambda code packages
+
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365]
+    Description: CloudWatch log retention in days
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Environment Configuration"
+        Parameters:
+          - Environment
+          - LogRetentionDays
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VpcCidr
+          - PublicSubnet1Cidr
+          - PublicSubnet2Cidr
+          - PrivateSubnet1Cidr
+          - PrivateSubnet2Cidr
+      - Label:
+          default: "Database Configuration"
+        Parameters:
+          - DBInstanceClass
+          - AllocatedStorage
+          - BackupRetentionPeriod
+          - MultiAZ
+      - Label:
+          default: "Lambda Configuration"
+        Parameters:
+          - ProcessorMemorySize
+          - ProcessorTimeout
+          - LambdaCodeBucket
+      - Label:
+          default: "Notification Configuration"
+        Parameters:
+          - NotificationEmail
+          - ScheduleExpression
+
+Resources:
+  # ============================================
+  # VPC Stack
+  # ============================================
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/vpc.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcCidr: !Ref VpcCidr
+        PublicSubnet1Cidr: !Ref PublicSubnet1Cidr
+        PublicSubnet2Cidr: !Ref PublicSubnet2Cidr
+        PrivateSubnet1Cidr: !Ref PrivateSubnet1Cidr
+        PrivateSubnet2Cidr: !Ref PrivateSubnet2Cidr
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-vpc-stack'
+        - Key: StackType
+          Value: VPC
+
+  # ============================================
+  # Security Groups Stack
+  # ============================================
+  SecurityGroupsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/security-groups.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt VPCStack.Outputs.VPCId
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-security-groups-stack'
+        - Key: StackType
+          Value: SecurityGroups
+
+  # ============================================
+  # SNS Stack
+  # ============================================
+  SNSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/sns.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        NotificationEmail: !Ref NotificationEmail
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-sns-stack'
+        - Key: StackType
+          Value: SNS
+
+  # ============================================
+  # IAM Stack
+  # ============================================
+  IAMStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: SNSStack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/iam.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-iam-stack'
+        - Key: StackType
+          Value: IAM
+
+  # ============================================
+  # RDS Stack
+  # ============================================
+  RDSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - SecurityGroupsStack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/rds.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt VPCStack.Outputs.VPCId
+        PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
+        PrivateSubnet2Id: !GetAtt VPCStack.Outputs.PrivateSubnet2Id
+        RDSSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.RDSSecurityGroupId
+        DBInstanceClass: !Ref DBInstanceClass
+        AllocatedStorage: !Ref AllocatedStorage
+        MaxAllocatedStorage: !Ref AllocatedStorage
+        BackupRetentionPeriod: !Ref BackupRetentionPeriod
+        MultiAZ: !Ref MultiAZ
+        DeletionProtection: 'false'
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-rds-stack'
+        - Key: StackType
+          Value: RDS
+
+  # ============================================
+  # Secrets Stack
+  # ============================================
+  SecretsStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - RDSStack
+      - SNSStack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/secrets.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt VPCStack.Outputs.VPCId
+        RDSEndpoint: !GetAtt RDSStack.Outputs.DBInstanceEndpoint
+        SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-secrets-stack'
+        - Key: StackType
+          Value: Secrets
+
+  # ============================================
+  # Lambda Stack
+  # ============================================
+  LambdaStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - SecurityGroupsStack
+      - IAMStack
+      - SecretsStack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/lambda.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt VPCStack.Outputs.VPCId
+        PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
+        PrivateSubnet2Id: !GetAtt VPCStack.Outputs.PrivateSubnet2Id
+        LambdaSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.LambdaSecurityGroupId
+        ProcessorLambdaRoleArn: !GetAtt IAMStack.Outputs.ProcessorLambdaRoleArn
+        SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
+        SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
+        ProcessorMemorySize: !Ref ProcessorMemorySize
+        ProcessorTimeout: !Ref ProcessorTimeout
+        LogRetentionDays: !Ref LogRetentionDays
+        LambdaCodeBucket: !Ref LambdaCodeBucket
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-lambda-stack'
+        - Key: StackType
+          Value: Lambda
+
+  # ============================================
+  # EventBridge Stack
+  # ============================================
+  EventBridgeStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: LambdaStack
+    Properties:
+      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/eventbridge.yaml'
+      Parameters:
+        Environment: !Ref Environment
+        ScheduleExpression: !Ref ScheduleExpression
+        ProcessorLambdaArn: !GetAtt LambdaStack.Outputs.ProcessorLambdaArn
+        EventBridgeRoleArn: !GetAtt IAMStack.Outputs.EventBridgeLambdaRoleArn
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-eventbridge-stack'
+        - Key: StackType
+          Value: EventBridge
+
+  # ============================================
+  # Custom Resource - Database Initialization
+  # ============================================
+  DatabaseInitialization:
+    Type: Custom::DatabaseInitializer
+    DependsOn:
+      - LambdaStack
+      - SecretsStack
+    Properties:
+      ServiceToken: !GetAtt LambdaStack.Outputs.ProcessorLambdaArn
+      SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
+      Environment: !Ref Environment
+
+Outputs:
+  StackName:
+    Description: Root Stack Name
+    Value: !Ref 'AWS::StackName'
+
+  VPCId:
+    Description: VPC ID
+    Value: !GetAtt VPCStack.Outputs.VPCId
+
+  RDSEndpoint:
+    Description: RDS Endpoint
+    Value: !GetAtt RDSStack.Outputs.DBInstanceEndpoint
+
+  SNSTopicArn:
+    Description: SNS Topic ARN
+    Value: !GetAtt SNSStack.Outputs.SNSTopicArn
+
+  ProcessorLambdaArn:
+    Description: Processor Lambda ARN
+    Value: !GetAtt LambdaStack.Outputs.ProcessorLambdaArn
+
+  EventBridgeRuleArn:
+    Description: EventBridge Rule ARN
+    Value: !GetAtt EventBridgeStack.Outputs.RuleArn

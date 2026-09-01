@@ -1,0 +1,71 @@
+# Production Environment Configuration
+# This file contains environment-specific settings for the production environment
+
+environment: prod
+region: us-east-1
+
+# VPC Configuration
+vpc:
+  cidr: 10.2.0.0/16
+  enableDnsHostnames: true
+  enableDnsSupport: true
+
+# Subnet Configuration
+subnets:
+  public:
+    - cidr: 10.2.1.0/24
+      az: a
+    - cidr: 10.2.2.0/24
+      az: b
+  private:
+    - cidr: 10.2.10.0/24
+      az: a
+    - cidr: 10.2.11.0/24
+      az: b
+
+# RDS Configuration
+rds:
+  engine: mysql
+  engineVersion: "8.0"
+  instanceClass: db.t3.medium
+  allocatedStorage: 100
+  maxAllocatedStorage: 500
+  backupRetention: 30
+  multiAz: true
+  storageEncrypted: true
+  deletionProtection: true
+  masterUsername: admin
+
+# Lambda Configuration
+lambda:
+  processor:
+    memorySize: 512
+    timeout: 300
+    runtime: python3.11
+    logRetention: 30
+  customResource:
+    memorySize: 256
+    timeout: 300
+    runtime: python3.11
+    logRetention: 30
+
+# EventBridge Configuration
+eventbridge:
+  schedule: "cron(0 8 * * ? *)"  # Daily at 8 AM UTC
+  enabled: true
+
+# SNS Configuration
+sns:
+  notificationEmail: alerts@example.com
+
+# CloudWatch Configuration
+cloudwatch:
+  logRetentionDays: 30
+  alarmEvaluationPeriods: 3
+  alarmThreshold: 1
+
+# Tags
+tags:
+  Environment: prod
+  Project: s214-sales-platform
+  ManagedBy: cloudformation

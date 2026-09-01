@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S214 Sales Platform - SNS Topic for Notifications
+  This template creates:
+  - SNS topic for sales report notifications
+  - Email subscription for notifications
+  - KMS encryption for the topic
+
+  Note: Email subscriptions require confirmation via email link'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Default: dev
+    Description: Environment name (dev, staging, prod)
+
+  NotificationEmail:
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    ConstraintDescription: Must be a valid email address
+    Description: Email address for notifications (requires confirmation)
+
+  KMSKeyId:
+    Type: String
+    Default: 'alias/aws/sns'
+    Description: KMS key ID for SNS encryption (default: AWS managed key)
+
+Resources:
+  # ============================================
+  # SNS Topic
+  # ============================================
+  SalesNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 's214-${Environment}-sales-notifications'
+      DisplayName: !Sub 'S214 ${Environment} Sales Notifications'
+      KmsMasterKeyId: !Ref KMSKeyId
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-sales-notifications'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: SNS
+
+  # ============================================
+  # SNS Topic Policy
+  # ============================================
+  SalesNotificationTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref SalesNotificationTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow Lambda to publish to the topic
+          - Sid: AllowLambdaPublish
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref SalesNotificationTopic
+            Condition:
+              StringEquals:
+                'AWS:SourceOwner': !Ref 'AWS::AccountId'
+
+          # Allow CloudWatch Alarms to publish
+          - Sid: AllowCloudWatchAlarms
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref SalesNotificationTopic
+
+          # Deny unencrypted transport
+          - Sid: DenyUnencryptedTransport
+            Effect: Deny
+            Principal: '*'
+            Action: sns:Publish
+            Resource: !Ref SalesNotificationTopic
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # ============================================
+  # Email Subscription
+  # ============================================
+  # Note: This subscription requires confirmation via email
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref SalesNotificationTopic
+      Protocol: email
+      Endpoint: !Ref NotificationEmail
+
+Outputs:
+  SNSTopicArn:
+    Description: SNS Topic ARN
+    Value: !Ref SalesNotificationTopic
+    Export:
+      Name: !Sub 's214-${Environment}-sns-topic-arn'
+
+  SNSTopicName:
+    Description: SNS Topic Name
+    Value: !GetAtt SalesNotificationTopic.TopicName
+    Export:
+      Name: !Sub 's214-${Environment}-sns-topic-name'
+
+  EmailSubscriptionArn:
+    Description: Email Subscription ARN (pending confirmation)
+    Value: !Ref EmailSubscription
+    Export:
+      Name: !Sub 's214-${Environment}-email-subscription-arn'
