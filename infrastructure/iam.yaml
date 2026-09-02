@@ -39,7 +39,6 @@ Resources:
   ProcessorLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 's214-${Environment}-processor-lambda-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -109,7 +108,6 @@ Resources:
   CustomResourceLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 's214-${Environment}-custom-resource-lambda-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -168,7 +166,6 @@ Resources:
   EventBridgeLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 's214-${Environment}-eventbridge-lambda-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

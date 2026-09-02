@@ -165,7 +165,7 @@ Resources:
   VPCStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/vpc.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/vpc.yaml'
       Parameters:
         Environment: !Ref Environment
         VpcCidr: !Ref VpcCidr
@@ -185,7 +185,7 @@ Resources:
   SecurityGroupsStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/security-groups.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/security-groups.yaml'
       Parameters:
         Environment: !Ref Environment
         VpcId: !GetAtt VPCStack.Outputs.VPCId
@@ -202,7 +202,7 @@ Resources:
   SNSStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/sns.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/sns.yaml'
       Parameters:
         Environment: !Ref Environment
         NotificationEmail: !Ref NotificationEmail
@@ -218,7 +218,7 @@ Resources:
   IAMStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/iam.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/iam.yaml'
       Parameters:
         Environment: !Ref Environment
         SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
@@ -235,7 +235,7 @@ Resources:
   RDSStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/rds.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/rds.yaml'
       Parameters:
         Environment: !Ref Environment
         PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
@@ -243,7 +243,7 @@ Resources:
         RDSSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.RDSSecurityGroupId
         DBInstanceClass: !Ref DBInstanceClass
         AllocatedStorage: !Ref AllocatedStorage
-        MaxAllocatedStorage: !Ref AllocatedStorage
+        MaxAllocatedStorage: 100
         BackupRetentionPeriod: !Ref BackupRetentionPeriod
         MultiAZ: !Ref MultiAZ
         DeletionProtection: 'false'
@@ -260,7 +260,7 @@ Resources:
   SecretsStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/secrets.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/secrets.yaml'
       Parameters:
         Environment: !Ref Environment
         SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
@@ -287,7 +287,7 @@ Resources:
   LambdaStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/lambda.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/lambda.yaml'
       Parameters:
         Environment: !Ref Environment
         PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
@@ -312,7 +312,7 @@ Resources:
   EventBridgeStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/eventbridge.yaml'
+      TemplateURL: !Sub 'https://${LambdaCodeBucket}.s3.${AWS::Region}.amazonaws.com/templates/eventbridge.yaml'
       Parameters:
         Environment: !Ref Environment
         ScheduleExpression: !Ref ScheduleExpression

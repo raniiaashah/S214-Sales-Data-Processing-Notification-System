@@ -118,10 +118,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - Fn::GetAZs: ''
+      AvailabilityZone: !Select [0, !GetAZs {Ref: 'AWS::Region'}]
       CidrBlock: !Ref PublicSubnet1Cidr
       MapPublicIpOnLaunch: true
       Tags:
@@ -138,10 +135,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone:
-        Fn::Select:
-          - 1
-          - Fn::GetAZs: ''
+      AvailabilityZone: !Select [1, !GetAZs {Ref: 'AWS::Region'}]
       CidrBlock: !Ref PublicSubnet2Cidr
       MapPublicIpOnLaunch: true
       Tags:
@@ -161,10 +155,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone:
-        Fn::Select:
-          - 0
-          - Fn::GetAZs: ''
+      AvailabilityZone: !Select [0, !GetAZs {Ref: 'AWS::Region'}]
       CidrBlock: !Ref PrivateSubnet1Cidr
       MapPublicIpOnLaunch: false
       Tags:
@@ -181,10 +172,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone:
-        Fn::Select:
-          - 1
-          - Fn::GetAZs: ''
+      AvailabilityZone: !Select [1, !GetAZs {Ref: 'AWS::Region'}]
       CidrBlock: !Ref PrivateSubnet2Cidr
       MapPublicIpOnLaunch: false
       Tags:
@@ -216,6 +204,8 @@ Resources:
   NatGateway:
     Type: AWS::EC2::NatGateway
     Properties:
+      AvailabilityMode: zonal
+      ConnectivityType: public
       AllocationId: !GetAtt NatGatewayEIP.AllocationId
       SubnetId: !Ref PublicSubnet1
       Tags:
@@ -261,14 +251,14 @@ Resources:
     DependsOn: InternetGatewayAttachment
     Properties:
       RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
+      DestinationCidrBlock: '0.0.0.0/0'
       GatewayId: !Ref InternetGateway
 
   PrivateRoute:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivateRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
+      DestinationCidrBlock: '0.0.0.0/0'
       NatGatewayId: !Ref NatGateway
 
   # ============================================
@@ -304,7 +294,6 @@ Resources:
   VPCFlowLogRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 's214-${Environment}-vpc-flowlog-role'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -329,14 +318,15 @@ Resources:
   VPCFlowLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub '/aws/vpc/s214-${Environment}-flowlogs'
+      LogGroupName: !Sub '/s214/${Environment}/vpc-flowlogs'
       RetentionInDays: 7
 
   VPCFlowLog:
     Type: AWS::EC2::FlowLog
     Properties:
       DeliverLogsPermissionArn: !GetAtt VPCFlowLogRole.Arn
-      LogGroupName: !Ref VPCFlowLogGroup
+      LogDestinationType: cloud-watch-logs
+      LogDestination: !GetAtt VPCFlowLogGroup.Arn
       ResourceId: !Ref VPC
       ResourceType: VPC
       TrafficType: ALL

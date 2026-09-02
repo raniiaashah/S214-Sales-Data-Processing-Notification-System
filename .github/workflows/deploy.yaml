@@ -216,6 +216,11 @@ jobs:
                 --stack-name "$nested_stack" \
                 --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
                 --output table || true
+              echo "Pre-deployment validation events for $nested_stack:"
+              aws cloudformation describe-events \
+                --stack-name "$nested_stack" \
+                --query 'OperationEvents[?EventType==`VALIDATION_ERROR`].[LogicalResourceId,ResourceType,ValidationName,ValidationStatusReason,ValidationPath]' \
+                --output table || true
             done
             exit 1
           }
