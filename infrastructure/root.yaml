@@ -329,9 +329,6 @@ Resources:
   # ============================================
   DatabaseInitialization:
     Type: Custom::DatabaseInitializer
-    DependsOn:
-      - RDSStack
-      - LambdaStack
     Properties:
       ServiceToken: !GetAtt LambdaStack.Outputs.CustomResourceLambdaArn
       SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
