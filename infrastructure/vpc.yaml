@@ -350,7 +350,7 @@ Outputs:
 
   VpcCidrBlock:
     Description: VPC CIDR Block
-    Value: !GetAtt VPC.CidrBlock
+    Value: !Ref VpcCidr
     Export:
       Name: !Sub 's214-${Environment}-vpc-cidr'
 
