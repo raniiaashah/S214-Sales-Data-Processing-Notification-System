@@ -189,6 +189,7 @@ jobs:
           fi
 
           if [ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ] || \
+             [ "$STACK_STATUS" == "ROLLBACK_FAILED" ] || \
              [ "$STACK_STATUS" == "UPDATE_ROLLBACK_FAILED" ] || \
              [ "$STACK_STATUS" == "CREATE_FAILED" ]; then
             echo "⚠️  Stack is in $STACK_STATUS state, deleting..."
