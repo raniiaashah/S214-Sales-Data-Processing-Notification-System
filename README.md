@@ -424,6 +424,12 @@ aws cloudformation deploy \
 4. **Initialize**: Custom Resource creates database schema and sample data
 5. **Verify**: Stack outputs are displayed
 
+### Deployment Verification
+
+The GitHub Actions deployment completed successfully:
+
+![Successful GitHub Actions deployment](docs/images/deployment-success.png)
+
 ---
 
 ## CI/CD
@@ -920,6 +926,14 @@ This platform automates daily sales processing and reporting, reducing manual re
 
 ---
 
+## Project Demo / Working Proof
+
+The screenshot below demonstrates the successfully deployed S214 Sales Data Processing and Notification System, with all CloudFormation stacks completing successfully in AWS.
+
+![AWS CloudFormation deployment showing successfully completed S214 stacks](docs/images/cloudformation-deployment-proof.png)
+
+---
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -938,4 +952,4 @@ For security concerns, please see [SECURITY.md](SECURITY.md).
 
 ---
 
-**Note**: This project is designed for portfolio demonstration. Some features may require actual AWS deployment to fully function. Screenshots and sample outputs are placeholders until deployment.
+**Note**: This project is designed for portfolio demonstration. Some features may require actual AWS deployment to fully function.
