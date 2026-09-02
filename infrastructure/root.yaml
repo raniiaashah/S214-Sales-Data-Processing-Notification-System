@@ -222,6 +222,7 @@ Resources:
       Parameters:
         Environment: !Ref Environment
         SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
+        SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
       Tags:
         - Key: Name
           Value: !Sub 's214-${Environment}-iam-stack'
