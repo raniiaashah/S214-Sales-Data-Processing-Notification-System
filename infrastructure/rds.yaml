@@ -122,6 +122,7 @@ Resources:
       DBInstanceClass: !Ref DBInstanceClass
       Engine: mysql
       EngineVersion: '8.0.46'
+      DBName: salesdb
       MasterUsername: !Ref MasterUsername
       MasterUserPassword: !Sub '{{resolve:secretsmanager:${SecretArn}:SecretString:password}}'
       DBSubnetGroupName: !Ref DBSubnetGroup
