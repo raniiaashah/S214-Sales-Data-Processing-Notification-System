@@ -16,9 +16,9 @@ Description: 'S214 Sales Platform - Root CloudFormation Stack
   1. VPC Stack (networking foundation)
   2. Security Groups Stack (depends on VPC)
   3. SNS Stack (notification topic)
-  4. IAM Stack (depends on SNS)
-  5. RDS Stack (depends on VPC, Security Groups)
-  6. Secrets Stack (depends on RDS, SNS)
+  4. Secrets Stack (depends on SNS)
+  5. IAM Stack (depends on SNS, Secrets)
+  6. RDS Stack (depends on VPC, Security Groups, Secrets)
   7. Lambda Stack (depends on VPC, IAM, Secrets, SNS)
   8. EventBridge Stack (depends on Lambda)
   9. Custom Resource (depends on Lambda, Secrets)'
@@ -247,6 +247,7 @@ Resources:
         BackupRetentionPeriod: !Ref BackupRetentionPeriod
         MultiAZ: !Ref MultiAZ
         DeletionProtection: 'false'
+        SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
       Tags:
         - Key: Name
           Value: !Sub 's214-${Environment}-rds-stack'
@@ -262,13 +263,23 @@ Resources:
       TemplateURL: !Sub 'https://s3.amazonaws.com/${LambdaCodeBucket}/templates/secrets.yaml'
       Parameters:
         Environment: !Ref Environment
-        RDSEndpoint: !GetAtt RDSStack.Outputs.DBInstanceEndpoint
         SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
       Tags:
         - Key: Name
           Value: !Sub 's214-${Environment}-secrets-stack'
         - Key: StackType
           Value: Secrets
+
+  RDSEndpointParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/s214/${Environment}/rds-endpoint'
+      Type: String
+      Value: !GetAtt RDSStack.Outputs.DBInstanceEndpoint
+      Description: !Sub 'RDS endpoint for ${Environment} environment'
+      Tags:
+        Environment: !Ref Environment
+        Project: s214-sales-platform
 
   # ============================================
   # Lambda Stack
