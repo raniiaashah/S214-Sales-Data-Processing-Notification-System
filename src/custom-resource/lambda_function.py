@@ -95,7 +95,12 @@ def handle_create(resource_properties: dict) -> tuple:
     """
     logger.info("Handling Create request - initializing database")
 
-    initializer = DatabaseInitializer(SECRET_ARN, AWS_REGION)
+    initializer = DatabaseInitializer(
+        SECRET_ARN,
+        AWS_REGION,
+        host=resource_properties["DatabaseHost"],
+        port=int(resource_properties.get("DatabasePort", 3306)),
+    )
     result = initializer.initialize()
 
     response_data = {
@@ -123,7 +128,12 @@ def handle_update(resource_properties: dict, physical_resource_id: str) -> tuple
     """
     logger.info("Handling Update request - re-initializing database")
 
-    initializer = DatabaseInitializer(SECRET_ARN, AWS_REGION)
+    initializer = DatabaseInitializer(
+        SECRET_ARN,
+        AWS_REGION,
+        host=resource_properties["DatabaseHost"],
+        port=int(resource_properties.get("DatabasePort", 3306)),
+    )
     result = initializer.initialize()
 
     response_data = {
@@ -150,7 +160,12 @@ def handle_delete(resource_properties: dict) -> dict:
     """
     logger.info("Handling Delete request - cleaning up database")
 
-    initializer = DatabaseInitializer(SECRET_ARN, AWS_REGION)
+    initializer = DatabaseInitializer(
+        SECRET_ARN,
+        AWS_REGION,
+        host=resource_properties["DatabaseHost"],
+        port=int(resource_properties.get("DatabasePort", 3306)),
+    )
     initializer.cleanup()
 
     response_data = {"Message": "Database cleanup completed successfully"}

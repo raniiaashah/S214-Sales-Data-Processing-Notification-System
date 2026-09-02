@@ -31,7 +31,14 @@ class DatabaseInitializer:
     without creating duplicate data or causing errors.
     """
 
-    def __init__(self, secret_arn: str, region: str = "us-east-1"):
+    def __init__(
+        self,
+        secret_arn: str,
+        region: str = "us-east-1",
+        host: str | None = None,
+        port: int | None = None,
+        dbname: str | None = None,
+    ):
         """
         Initialize the DatabaseInitializer.
 
@@ -41,6 +48,9 @@ class DatabaseInitializer:
         """
         self.secret_arn = secret_arn
         self.region = region
+        self.host = host
+        self.port = port
+        self.dbname = dbname
         self.connection = None
         self.credentials = None
 
@@ -62,9 +72,9 @@ class DatabaseInitializer:
             self.credentials = {
                 "username": secret["username"],
                 "password": secret["password"],
-                "host": secret.get("host", ""),
-                "port": secret.get("port", 3306),
-                "dbname": secret.get("dbname", "salesdb"),
+                "host": self.host or secret.get("host", ""),
+                "port": self.port or secret.get("port", 3306),
+                "dbname": self.dbname or secret.get("dbname", "salesdb"),
             }
 
             return self.credentials

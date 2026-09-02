@@ -36,6 +36,10 @@ Parameters:
     Type: String
     Description: Processor Lambda IAM role ARN
 
+  CustomResourceLambdaRoleArn:
+    Type: String
+    Description: Custom resource Lambda IAM role ARN
+
   SecretArn:
     Type: String
     Description: ARN of the Secrets Manager secret
@@ -72,6 +76,11 @@ Parameters:
     Type: String
     Default: lambda/processor.zip
     Description: S3 key for Lambda code package
+
+  CustomResourceLambdaCodeKey:
+    Type: String
+    Default: lambda/custom-resource.zip
+    Description: S3 key for custom resource Lambda code package
 
 Resources:
   # ============================================
@@ -116,6 +125,50 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub 's214-${Environment}-sales-processor'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: s214-sales-platform
+        - Key: ResourceType
+          Value: Lambda
+
+  # ============================================
+  # Database Initialization Custom Resource Lambda
+  # ============================================
+  CustomResourceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/s214-${Environment}-custom-resource'
+      RetentionInDays: !Ref LogRetentionDays
+
+  CustomResourceLambda:
+    Type: AWS::Lambda::Function
+    DependsOn: CustomResourceLogGroup
+    Properties:
+      FunctionName: !Sub 's214-${Environment}-custom-resource'
+      Description: Initializes the RDS database schema during stack deployment
+      Runtime: python3.14
+      Handler: lambda_function.lambda_handler
+      Role: !Ref CustomResourceLambdaRoleArn
+      MemorySize: 256
+      Timeout: 900
+      Environment:
+        Variables:
+          SECRET_ARN: !Ref SecretArn
+          ENVIRONMENT: !Ref Environment
+          LOG_LEVEL: INFO
+      VpcConfig:
+        SubnetIds:
+          - !Ref PrivateSubnet1Id
+          - !Ref PrivateSubnet2Id
+        SecurityGroupIds:
+          - !Ref LambdaSecurityGroupId
+      Code:
+        S3Bucket: !Ref LambdaCodeBucket
+        S3Key: !Ref CustomResourceLambdaCodeKey
+      Tags:
+        - Key: Name
+          Value: !Sub 's214-${Environment}-custom-resource'
         - Key: Environment
           Value: !Ref Environment
         - Key: Project
@@ -196,3 +249,9 @@ Outputs:
     Value: !Ref ProcessorLogGroup
     Export:
       Name: !Sub 's214-${Environment}-processor-log-group'
+
+  CustomResourceLambdaArn:
+    Description: Database initialization custom resource Lambda ARN
+    Value: !GetAtt CustomResourceLambda.Arn
+    Export:
+      Name: !Sub 's214-${Environment}-custom-resource-lambda-arn'

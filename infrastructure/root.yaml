@@ -294,6 +294,7 @@ Resources:
         PrivateSubnet2Id: !GetAtt VPCStack.Outputs.PrivateSubnet2Id
         LambdaSecurityGroupId: !GetAtt SecurityGroupsStack.Outputs.LambdaSecurityGroupId
         ProcessorLambdaRoleArn: !GetAtt IAMStack.Outputs.ProcessorLambdaRoleArn
+        CustomResourceLambdaRoleArn: !GetAtt IAMStack.Outputs.CustomResourceLambdaRoleArn
         SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
         SNSTopicArn: !GetAtt SNSStack.Outputs.SNSTopicArn
         ProcessorMemorySize: !Ref ProcessorMemorySize
@@ -329,8 +330,10 @@ Resources:
   DatabaseInitialization:
     Type: Custom::DatabaseInitializer
     Properties:
-      ServiceToken: !GetAtt LambdaStack.Outputs.ProcessorLambdaArn
+      ServiceToken: !GetAtt LambdaStack.Outputs.CustomResourceLambdaArn
       SecretArn: !GetAtt SecretsStack.Outputs.DatabaseSecretArn
+      DatabaseHost: !GetAtt RDSStack.Outputs.DBInstanceEndpoint
+      DatabasePort: !GetAtt RDSStack.Outputs.DBInstancePort
       Environment: !Ref Environment
 
 Outputs:
