@@ -202,8 +202,21 @@ jobs:
             echo "❌ Deployment failed. Fetching stack events..."
             aws cloudformation describe-stack-events \
               --stack-name $STACK_NAME \
-              --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED` || ResourceStatus==`ROLLBACK_IN_PROGRESS` || ResourceStatus==`DELETE_IN_PROGRESS`]' \
+              --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED` || ResourceStatus==`ROLLBACK_IN_PROGRESS` || ResourceStatus==`DELETE_IN_PROGRESS`].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
               --output table
+            echo "Failed nested stack details:"
+            for nested_stack in $(aws cloudformation describe-stack-events \
+              --stack-name $STACK_NAME \
+              --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].PhysicalResourceId' \
+              --output text); do
+              if [[ "$nested_stack" != arn:aws:cloudformation:* ]]; then
+                continue
+              fi
+              aws cloudformation describe-stack-events \
+                --stack-name "$nested_stack" \
+                --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
+                --output table || true
+            done
             exit 1
           }
 
