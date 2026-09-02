@@ -171,14 +171,27 @@ jobs:
         run: |
           STACK_NAME="s214-${{ needs.determine-env.outputs.environment }}-sales-platform"
           
-          # Check if stack exists and is in ROLLBACK_COMPLETE state
+          # Wait for a previous failed deployment to finish rolling back.
           STACK_STATUS=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
             --query 'Stacks[0].StackStatus' \
             --output text 2>/dev/null || echo "NONE")
           
-          if [ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]; then
-            echo "⚠️  Stack is in ROLLBACK_COMPLETE state, deleting..."
+          if [ "$STACK_STATUS" == "ROLLBACK_IN_PROGRESS" ]; then
+            echo "⚠️  Stack is still rolling back, waiting..."
+            aws cloudformation wait stack-rollback-complete --stack-name $STACK_NAME
+            STACK_STATUS="ROLLBACK_COMPLETE"
+          elif [ "$STACK_STATUS" == "UPDATE_ROLLBACK_IN_PROGRESS" ] || \
+               [ "$STACK_STATUS" == "UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS" ]; then
+            echo "⚠️  Stack is still updating and rolling back, waiting..."
+            aws cloudformation wait stack-update-rollback-complete --stack-name $STACK_NAME
+            STACK_STATUS="UPDATE_ROLLBACK_COMPLETE"
+          fi
+
+          if [ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ] || \
+             [ "$STACK_STATUS" == "UPDATE_ROLLBACK_FAILED" ] || \
+             [ "$STACK_STATUS" == "CREATE_FAILED" ]; then
+            echo "⚠️  Stack is in $STACK_STATUS state, deleting..."
             aws cloudformation delete-stack --stack-name $STACK_NAME
             aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME
             echo "✅ Stack deleted successfully"
